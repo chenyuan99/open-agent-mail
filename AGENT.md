@@ -8,12 +8,15 @@ Maintain a small, local-first inbox for communication between people and softwar
 
 Read [SPEC.md](SPEC.md) before changing behavior. Update the specification in the same change whenever product behavior or an HTTP contract changes.
 
+For proposed capabilities, use the OpenSpec workflow in `openspec/`: review `proposal.md`, behavioral specs, `design.md`, and `tasks.md` before implementation. Do not describe a proposed capability as shipped until its change is implemented, verified, synced into `openspec/specs/`, and archived.
+
 ## Architecture
 
 - `src/open_agent_mail/server.py`: in-memory domain store, HTTP API, static-file server, and CLI.
 - `src/open_agent_mail/static/`: framework-free browser interface.
 - `tests/`: standard-library unit and HTTP integration tests.
 - `.agents/skills/open-agent-mail/`: reusable workflow for future agents.
+- `openspec/`: current capability specs and self-contained proposed changes.
 
 ## Working rules
 

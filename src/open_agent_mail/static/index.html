@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="en">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Open Agent Mail</title><link rel="stylesheet" href="/styles.css"><link rel="stylesheet" href="/contacts.css"><link rel="stylesheet" href="/help.css"></head>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#f7f8f6"><title>Open Agent Mail</title><link rel="stylesheet" href="/styles.css"><link rel="stylesheet" href="/contacts.css"><link rel="stylesheet" href="/help.css"><link rel="stylesheet" href="/shadcn-theme.css"></head>
 <body>
   <div class="app">
     <aside>
@@ -14,7 +14,7 @@
       <header>
         <div class="agent-icon">◉</div><div class="identity"><small>ACTIVE MAILBOX</small><h1 id="address"></h1><p><i></i> Connected and listening</p></div>
         <div class="stats"><div><small>UNREAD</small><strong id="unread">0</strong></div><div><small>STORAGE</small><strong id="storage">0 KB</strong></div></div>
-        <button id="compose" class="primary">Compose <span>⌘K</span></button>
+        <button id="themeToggle" class="icon-button" type="button" aria-label="Toggle color theme" aria-pressed="false"><span aria-hidden="true">☾</span></button><button id="compose" class="primary">Compose <span>⌘K</span></button>
       </header>
       <section class="content">
         <div class="toolbar"><div class="tabs"><button class="tab active" data-folder="inbox">Inbox <em id="inboxCount">0</em></button><button class="tab" data-folder="sent">Sent</button></div><label class="search">⌕<input id="search" placeholder="Search mail"></label></div>
@@ -24,8 +24,8 @@
       </section>
     </main>
   </div>
-  <dialog id="messageDialog"><button class="close" aria-label="Close">×</button><small id="messageMeta"></small><h2 id="messageSubject"></h2><p id="messageRoute"></p><div id="messageBody" class="message-body"></div></dialog>
-  <dialog id="composeDialog"><button class="close" aria-label="Close">×</button><small>NEW MESSAGE</small><h2>Compose</h2><form id="composeForm"><label>To<input name="recipient" type="email" list="contactEmails" placeholder="agent@example.com" required><datalist id="contactEmails"></datalist></label><label>Subject<input name="subject" placeholder="What is this about?" required></label><label>Message<textarea name="body" rows="7" placeholder="Write a clear instruction or update…" required></textarea></label><div class="form-actions"><span id="formStatus"></span><button class="primary" type="submit">Send message →</button></div></form></dialog>
+  <dialog id="messageDialog"><button class="close" aria-label="Close">×</button><small id="messageMeta"></small><h2 id="messageSubject"></h2><p id="messageRoute"></p><div id="messageBody" class="message-body"></div><button id="replyMessage" class="primary" type="button">Reply in thread</button></dialog>
+  <dialog id="composeDialog"><button class="close" aria-label="Close">×</button><small>NEW MESSAGE</small><h2>Compose</h2><form id="composeForm"><input name="in_reply_to" type="hidden"><label>To<input name="recipient" type="email" list="contactEmails" placeholder="agent@example.com" required><datalist id="contactEmails"></datalist></label><label>Subject<input name="subject" placeholder="What is this about?" required></label><label>Message<textarea name="body" rows="7" placeholder="Write a clear instruction or update…" required></textarea></label><div class="form-actions"><span id="formStatus"></span><button class="primary" type="submit">Send message →</button></div></form></dialog>
   <dialog id="contactsDialog"><button class="close" aria-label="Close">×</button><small>ADDRESS BOOK</small><h2>Contacts</h2><label class="search contact-search">⌕<input id="contactSearch" placeholder="Search names, emails, groups"></label><div id="contactList" class="contact-list"></div><form id="contactForm" class="contact-form"><h3>Add contact</h3><label>Name<input name="name" required placeholder="Name"></label><label>Email<input name="email" type="email" required placeholder="agent@example.com"></label><label>Groups<input name="groups" placeholder="Work, Agents"></label><div class="form-actions"><span id="contactStatus"></span><button class="primary" type="submit">Add contact</button></div></form></dialog>
   <dialog id="helpDialog" class="help-dialog"><button class="close" aria-label="关闭帮助中心">×</button><div class="help-header"><small>OPEN AGENT MAIL</small><h2>帮助中心</h2><p>查找产品使用指南和常见问题</p><label class="help-search">⌕<input id="helpSearch" placeholder="搜索问题，例如：收件人" autocomplete="off"></label></div><div class="help-layout"><nav id="helpCategories" class="help-categories" aria-label="帮助分类"></nav><section class="help-results"><button id="helpBack" class="help-back" hidden>← 返回搜索结果</button><div id="helpArticleList"></div><article id="helpArticle" class="help-article" hidden></article></section></div></dialog>
   <div id="toast" role="status"></div>

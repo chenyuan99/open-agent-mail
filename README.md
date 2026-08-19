@@ -1,6 +1,6 @@
 # Open Agent Mail
 
-A local-first inbox for messages between people and software agents. It includes multiple agent mailboxes, inbox and sent views, search, read state, contact management, recipient autocomplete, message composition, and an in-app help center, with no runtime dependencies.
+A local-first inbox for messages between people and software agents. It includes multiple agent mailboxes, local agent-to-agent delivery, threaded replies, inbox and sent views, search, read state, contact management, recipient autocomplete, message composition, and an in-app help center, with no runtime dependencies.
 
 ## Run
 
@@ -60,8 +60,24 @@ The store is intentionally process-local. Restarting the server restores the see
 | --- | --- | --- |
 | `GET` | `/api/state` | Load mailboxes, messages, and contacts. |
 | `POST` | `/api/mailboxes` | Create a local agent mailbox. |
-| `POST` | `/api/messages` | Add a message to the selected mailbox's Sent folder. |
+| `POST` | `/api/messages` | Send a message; local recipients receive an Inbox copy. Pass `in_reply_to` to continue a thread. |
 | `POST` | `/api/messages/{id}/read` | Mark a message as read. |
+
+### Agent CLI
+
+Commands emit JSON so agent runtimes can parse results without scraping the browser:
+
+```powershell
+open-agent-mail create-mailbox bull-researcher
+open-agent-mail send --from bull-researcher@agent.local --to bear-researcher@agent.local --subject "[AAPL] Debate" --body "Review the bull case."
+open-agent-mail inbox --mailbox bear-researcher@agent.local --unread
+open-agent-mail read --mailbox bear-researcher@agent.local 5
+open-agent-mail reply --from bear-researcher@agent.local 5 --body "Here is the bear case."
+```
+
+From a source checkout, use `$env:PYTHONPATH = "src"` and replace `open-agent-mail` with `python -m open_agent_mail`.
+
+Use `--url http://host:port` on any command, or set `OPEN_AGENT_MAIL_URL`, when the server is not at `http://127.0.0.1:8787`.
 | `POST` | `/api/contacts` | Create a contact. |
 | `DELETE` | `/api/contacts/{id}` | Delete a contact. |
 
@@ -76,6 +92,12 @@ Cloudflare can provide custom-domain inbound routing and outbound delivery aroun
 - **Outbound delivery:** The Python server can send composed messages through Cloudflare Email Service's REST API after the sending domain is onboarded.
 
 See [Cloudflare Email Service integration](docs/cloudflare-email.md) for setup, architecture, proposed configuration, security requirements, limits, and implementation phases.
+
+### Multica agent-to-agent email
+
+Open Agent Mail can act as the mailbox and policy layer for coding agents managed by Multica. Each agent uses an email-capable MCP server or a webhook adapter because Multica agents do not receive native email inboxes or notifications.
+
+The integration is managed as an OpenSpec change. Start with the [proposal](openspec/changes/add-multica-agent-email/proposal.md), then review its [behavioral specification](openspec/changes/add-multica-agent-email/specs/agent-email/spec.md), [technical design](openspec/changes/add-multica-agent-email/design.md), and [implementation tasks](openspec/changes/add-multica-agent-email/tasks.md).
 
 ### Security boundaries
 

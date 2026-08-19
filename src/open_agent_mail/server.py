@@ -26,6 +26,8 @@ class Message:
     subject: str
     body: str
     created_at: str
+    thread_id: str = ""
+    in_reply_to: int | None = None
     read: bool = False
 
 
@@ -69,11 +71,21 @@ class Store:
             self.mailboxes.append(address)
             return True
 
-    def send(self, mailbox: str, recipient: str, subject: str, body: str) -> Message:
+    def send(self, mailbox: str, recipient: str, subject: str, body: str,
+             in_reply_to: int | None = None) -> Message | None:
         with self.lock:
-            message = Message(max((m.id for m in self.messages), default=0) + 1, mailbox, "sent", mailbox,
-                              recipient, subject, body, datetime.now(timezone.utc).isoformat(), True)
+            parent = next((m for m in self.messages if m.id == in_reply_to), None) if in_reply_to else None
+            if in_reply_to and parent is None:
+                return None
+            next_id = max((m.id for m in self.messages), default=0) + 1
+            thread_id = parent.thread_id or f"thread-{parent.id}" if parent else f"thread-{next_id}"
+            created_at = datetime.now(timezone.utc).isoformat()
+            message = Message(next_id, mailbox, "sent", mailbox, recipient, subject, body,
+                              created_at, thread_id, in_reply_to, True)
             self.messages.append(message)
+            if recipient in self.mailboxes:
+                self.messages.append(Message(next_id + 1, recipient, "inbox", mailbox, recipient,
+                                             subject, body, created_at, thread_id, in_reply_to, False))
             return message
 
     def mark_read(self, message_id: int) -> bool:
@@ -159,7 +171,14 @@ class Handler(BaseHTTPRequestHandler):
             if any(not str(body.get(key, "")).strip() for key in required):
                 self._json({"error": "All message fields are required."}, HTTPStatus.BAD_REQUEST)
                 return
-            message = STORE.send(*(str(body[key]).strip() for key in required))
+            in_reply_to = body.get("in_reply_to")
+            if in_reply_to is not None and (not isinstance(in_reply_to, int) or isinstance(in_reply_to, bool)):
+                self._json({"error": "in_reply_to must be a message ID."}, HTTPStatus.BAD_REQUEST)
+                return
+            message = STORE.send(*(str(body[key]).strip() for key in required), in_reply_to=in_reply_to)
+            if message is None:
+                self._json({"error": "Reply target not found."}, HTTPStatus.NOT_FOUND)
+                return
             self._json(asdict(message), HTTPStatus.CREATED)
             return
         if path == "/api/contacts":
@@ -201,12 +220,12 @@ class Handler(BaseHTTPRequestHandler):
         self.send_error(HTTPStatus.NOT_FOUND)
 
 
-def main() -> None:
+def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description="Run the Open Agent Mail web app")
     parser.add_argument("--host", default="127.0.0.1")
     parser.add_argument("--port", type=int, default=8787)
     parser.add_argument("--no-browser", action="store_true")
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
     server = ThreadingHTTPServer((args.host, args.port), Handler)
     url = f"http://{args.host}:{args.port}"
     print(f"Open Agent Mail is running at {url} (Ctrl+C to stop)")

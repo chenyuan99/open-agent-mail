@@ -1,0 +1,141 @@
+:root {
+  color-scheme: light;
+  --background: oklch(0.982 0.004 150);
+  --foreground: oklch(0.19 0.012 155);
+  --card: oklch(1 0 0);
+  --card-foreground: var(--foreground);
+  --popover: oklch(1 0 0);
+  --popover-foreground: var(--foreground);
+  --primary: oklch(0.45 0.105 160);
+  --primary-foreground: oklch(0.985 0.002 150);
+  --secondary: oklch(0.95 0.009 155);
+  --secondary-foreground: oklch(0.27 0.02 155);
+  --muted: oklch(0.955 0.006 150);
+  --muted-foreground: oklch(0.52 0.014 155);
+  --accent: oklch(0.925 0.026 155);
+  --accent-foreground: oklch(0.33 0.07 158);
+  --destructive: oklch(0.58 0.19 25);
+  --destructive-foreground: oklch(0.985 0 0);
+  --border: oklch(0.9 0.009 150);
+  --input: oklch(0.9 0.009 150);
+  --ring: oklch(0.55 0.11 160);
+  --radius: 0.75rem;
+  --sidebar: oklch(0.97 0.007 150);
+  --sidebar-foreground: var(--foreground);
+  --sidebar-accent: oklch(0.925 0.022 155);
+  --sidebar-accent-foreground: oklch(0.3 0.055 158);
+  --sidebar-border: var(--border);
+  --shadow-sm: 0 1px 2px rgb(23 32 31 / 0.05);
+  --shadow-card: 0 1px 3px rgb(23 32 31 / 0.06), 0 1px 2px rgb(23 32 31 / 0.03);
+  --shadow-dialog: 0 24px 80px rgb(10 20 16 / 0.24);
+}
+
+:root.dark {
+  color-scheme: dark;
+  --background: oklch(0.17 0.012 155);
+  --foreground: oklch(0.94 0.006 150);
+  --card: oklch(0.205 0.014 155);
+  --card-foreground: var(--foreground);
+  --popover: oklch(0.225 0.015 155);
+  --popover-foreground: var(--foreground);
+  --primary: oklch(0.72 0.12 158);
+  --primary-foreground: oklch(0.16 0.02 160);
+  --secondary: oklch(0.27 0.014 155);
+  --secondary-foreground: var(--foreground);
+  --muted: oklch(0.255 0.012 155);
+  --muted-foreground: oklch(0.7 0.012 150);
+  --accent: oklch(0.3 0.035 158);
+  --accent-foreground: oklch(0.9 0.04 155);
+  --destructive: oklch(0.65 0.19 25);
+  --destructive-foreground: oklch(0.98 0 0);
+  --border: oklch(0.32 0.014 155);
+  --input: oklch(0.32 0.014 155);
+  --ring: oklch(0.68 0.12 158);
+  --sidebar: oklch(0.19 0.012 155);
+  --sidebar-foreground: var(--foreground);
+  --sidebar-accent: oklch(0.28 0.03 158);
+  --sidebar-accent-foreground: var(--foreground);
+  --sidebar-border: var(--border);
+  --shadow-card: 0 1px 3px rgb(0 0 0 / 0.25);
+  --shadow-dialog: 0 24px 90px rgb(0 0 0 / 0.5);
+}
+
+* { border-color: var(--border); }
+html { background: var(--background); }
+body { background: var(--background); color: var(--foreground); transition: background-color .18s ease, color .18s ease; }
+aside { background: var(--sidebar); border-color: var(--sidebar-border); color: var(--sidebar-foreground); }
+main { background: radial-gradient(circle at 88% 0%, color-mix(in oklch, var(--accent) 48%, transparent), transparent 30%); }
+header, .content { background: var(--card); color: var(--card-foreground); border-color: var(--border); box-shadow: var(--shadow-card); }
+header { border-radius: calc(var(--radius) + .25rem); }
+.content { border-radius: calc(var(--radius) + .25rem); }
+.brand b, .tab em { background: var(--accent); color: var(--accent-foreground); }
+.logo, .agent-icon { background: var(--card); border-color: var(--border); color: var(--primary); box-shadow: var(--shadow-sm); }
+.mailbox { color: var(--sidebar-foreground); border: 1px solid transparent; transition: background-color .15s ease, border-color .15s ease, color .15s ease; }
+.mailbox:hover { background: var(--sidebar-accent); border-color: var(--sidebar-border); }
+.mailbox.active { background: var(--primary); color: var(--primary-foreground); box-shadow: var(--shadow-sm); }
+.mailbox small, .identity p, .columns, .message-row time, .summary span, .empty, .aside-foot small { color: var(--muted-foreground) !important; }
+.add { border-color: var(--border); color: var(--muted-foreground); background: color-mix(in oklch, var(--card) 45%, transparent); }
+.add:hover { background: var(--sidebar-accent); color: var(--sidebar-accent-foreground); border-style: solid; }
+.aside-foot { color: var(--sidebar-foreground); border-color: var(--sidebar-border); }
+.primary { background: var(--primary); color: var(--primary-foreground); border-radius: calc(var(--radius) - .15rem); box-shadow: var(--shadow-sm); transition: filter .15s ease, transform .15s ease; }
+.primary:hover { background: var(--primary); filter: brightness(.94); }
+.primary:active { transform: translateY(1px); }
+.icon-button { width: 40px; height: 40px; display: grid; place-items: center; border: 1px solid var(--border); border-radius: calc(var(--radius) - .15rem); background: var(--card); color: var(--foreground); cursor: pointer; font-size: 17px; box-shadow: var(--shadow-sm); }
+.icon-button:hover { background: var(--accent); color: var(--accent-foreground); }
+.tab { color: var(--muted-foreground); font-family: inherit; font-weight: 600; }
+.tab.active { color: var(--foreground); }
+.tab.active:after { background: var(--primary); }
+.search, .help-search { background: var(--card); border-color: var(--input); color: var(--muted-foreground); box-shadow: var(--shadow-sm); }
+.search:focus-within, .help-search:focus-within { border-color: var(--ring); box-shadow: 0 0 0 3px color-mix(in oklch, var(--ring) 22%, transparent); }
+.search input, .help-search input { background: transparent; color: var(--foreground); }
+.message-row { transition: background-color .12s ease; }
+.message-row:hover { background: var(--accent); }
+.message-row.unread { box-shadow: inset 3px 0 var(--primary); }
+.message-row.unread b, .message-row.unread > strong { font-weight: 750; }
+dialog { background: var(--popover); color: var(--popover-foreground); border-color: var(--border); border-radius: calc(var(--radius) + .35rem); box-shadow: var(--shadow-dialog); }
+dialog::backdrop { background: rgb(5 12 9 / .58); backdrop-filter: blur(4px); }
+.close { color: var(--muted-foreground); border-radius: .4rem; }
+.close:hover { background: var(--accent); color: var(--accent-foreground); }
+form input, form textarea { background: var(--background); color: var(--foreground); border-color: var(--input); border-radius: calc(var(--radius) - .15rem); }
+form input:focus, form textarea:focus { border-color: var(--ring); box-shadow: 0 0 0 3px color-mix(in oklch, var(--ring) 22%, transparent); }
+.contact-list { border-color: var(--border); }
+.contact-card { border-color: var(--border); }
+.contact-card:hover { background: var(--accent); }
+.contact-avatar { background: var(--accent); color: var(--accent-foreground); }
+.contact-delete { color: var(--destructive); border-radius: .4rem; }
+.contact-delete:hover { background: color-mix(in oklch, var(--destructive) 12%, transparent); }
+.help-header { background: linear-gradient(135deg, var(--accent), var(--popover)); border-color: var(--border); }
+.help-categories { background: var(--muted); border-color: var(--border); }
+.help-category { color: var(--muted-foreground); }
+.help-category:hover { background: var(--card); }
+.help-category.active { background: var(--primary); color: var(--primary-foreground); }
+.help-item { border-color: var(--border); color: var(--foreground); border-radius: .45rem; }
+.help-item:hover { background: var(--accent); }
+.help-item:hover strong { color: var(--accent-foreground); }
+.help-article .help-body { color: var(--foreground); }
+#toast { background: var(--foreground); color: var(--background); border: 1px solid var(--border); box-shadow: var(--shadow-dialog); }
+
+button, input, textarea { font: inherit; }
+button:focus-visible, input:focus-visible, textarea:focus-visible, [tabindex]:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+input::placeholder, textarea::placeholder { color: var(--muted-foreground); opacity: .82; }
+
+@media (max-width: 800px) {
+  main { background: var(--background); }
+  header { gap: 14px; }
+  .icon-button { margin-left: auto; }
+  header > .primary { margin-left: 0; }
+}
+
+@media (max-width: 430px) {
+  main { padding: 8px; }
+  header { padding: 16px; }
+  .identity h1 { font-size: 19px; overflow-wrap: anywhere; }
+  .stats { margin-left: 0; width: 100%; padding-left: 72px; }
+  .toolbar { align-items: center; height: auto; min-height: 70px; flex-wrap: wrap; padding-top: 12px; }
+  .search { width: 100%; margin: 10px 0 12px; }
+  .search input { width: calc(100% - 28px); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; }
+}

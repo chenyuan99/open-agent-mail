@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 import json
+from io import StringIO
 import threading
 import unittest
 from http.client import HTTPConnection
 
 import open_agent_mail.server as server_module
 from open_agent_mail.server import Handler, Store, ThreadingHTTPServer
+from open_agent_mail.cli import run as run_cli
 
 
 class StoreTests(unittest.TestCase):
@@ -28,6 +30,16 @@ class StoreTests(unittest.TestCase):
         self.assertEqual("sent", message.folder)
         self.assertTrue(message.read)
         self.assertEqual(4, message.id)
+        self.assertEqual("thread-4", message.thread_id)
+
+    def test_local_delivery_and_reply_preserve_thread(self) -> None:
+        first = self.store.send("hello@agent.local", "research@agent.local", "Review", "Please review")
+        inbox_copy = self.store.payload()["messages"][-1]
+        self.assertEqual("inbox", inbox_copy["folder"])
+        self.assertEqual(first.thread_id, inbox_copy["thread_id"])
+        reply = self.store.send("research@agent.local", "hello@agent.local", "Re: Review", "Approved", inbox_copy["id"])
+        self.assertEqual(first.thread_id, reply.thread_id)
+        self.assertEqual(inbox_copy["id"], reply.in_reply_to)
 
     def test_mark_read_reports_presence(self) -> None:
         self.assertTrue(self.store.mark_read(1))
@@ -89,6 +101,17 @@ class HttpTests(unittest.TestCase):
         self.assertIn("HELP_ARTICLES".encode(), body)
         self.assertIn("recipient".encode(), body)
 
+    def test_serves_semantic_theme_assets(self) -> None:
+        status, content_type, body = self.request("GET", "/shadcn-theme.css")
+        self.assertEqual(200, status)
+        self.assertIn("text/css", content_type)
+        self.assertIn(b"--primary", body)
+        self.assertIn(b"prefers-reduced-motion", body)
+        status, _, body = self.request("GET", "/")
+        self.assertEqual(200, status)
+        self.assertIn(b"themeToggle", body)
+        self.assertIn(b"shadcn-theme.css", body)
+
     def test_state_endpoint(self) -> None:
         status, _, body = self.request("GET", "/api/state")
         self.assertEqual(200, status)
@@ -123,6 +146,32 @@ class HttpTests(unittest.TestCase):
         status, _, body = self.request("POST", "/api/messages", {"mailbox": "hello@agent.local"})
         self.assertEqual(400, status)
         self.assertIn("error", json.loads(body))
+
+    def test_rejects_unknown_reply_target(self) -> None:
+        status, _, body = self.request("POST", "/api/messages", {
+            "mailbox": "hello@agent.local", "recipient": "research@agent.local",
+            "subject": "Re: Missing", "body": "Reply", "in_reply_to": 999,
+        })
+        self.assertEqual(404, status)
+        self.assertIn("error", json.loads(body))
+
+    def test_agent_cli_send_list_read_and_reply(self) -> None:
+        base = f"http://127.0.0.1:{self.httpd.server_port}"
+        output = StringIO()
+        self.assertEqual(0, run_cli(["send", "--url", base, "--from", "hello@agent.local",
+                                    "--to", "research@agent.local", "--subject", "Review", "--body", "Check it"], output))
+        sent = json.loads(output.getvalue())
+        output = StringIO()
+        self.assertEqual(0, run_cli(["inbox", "--url", base, "--mailbox", "research@agent.local", "--unread"], output))
+        inbox = json.loads(output.getvalue())["messages"]
+        delivered = next(message for message in inbox if message["thread_id"] == sent["thread_id"])
+        output = StringIO()
+        self.assertEqual(0, run_cli(["read", "--url", base, "--mailbox", "research@agent.local",
+                                    str(delivered["id"])], output))
+        output = StringIO()
+        self.assertEqual(0, run_cli(["reply", "--url", base, "--from", "research@agent.local",
+                                    str(delivered["id"]), "--body", "Approved"], output))
+        self.assertEqual(sent["thread_id"], json.loads(output.getvalue())["thread_id"])
 
     def test_contact_api_create_duplicate_validate_and_delete(self) -> None:
         status, _, body = self.request("POST", "/api/contacts", {

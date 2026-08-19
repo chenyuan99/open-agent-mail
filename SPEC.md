@@ -27,6 +27,8 @@ A mailbox is a unique address ending in `@agent.local`. A contact has a unique i
 | `body` | string | Non-empty plain-text body |
 | `created_at` | ISO-8601 string | UTC creation time |
 | `read` | boolean | Whether the message has been opened |
+| `thread_id` | string | Stable identifier shared by all messages in a conversation |
+| `in_reply_to` | integer or null | Process-local identifier of the replied-to message |
 
 Mailbox names accept ASCII letters, numbers, hyphens, and underscores. Input is lowercased, spaces become hyphens, and the `@agent.local` suffix is added by the server.
 
@@ -42,7 +44,7 @@ Accept `{ "name": string }`. Return `201` with `{ "address": string }`. Return `
 
 ### `POST /api/messages`
 
-Accept non-empty `mailbox`, `recipient`, `subject`, and `body` strings. Create a read message in the selected mailbox's `sent` folder and return it with `201`. Return `400` when any required field is empty.
+Accept non-empty `mailbox`, `recipient`, `subject`, and `body` strings plus optional integer `in_reply_to`. Create a read message in the selected mailbox's `sent` folder and return it with `201`. When the recipient is a local mailbox, also create an unread inbox copy with the same thread ID. Replies inherit the target's thread ID. Return `400` when required fields are empty or the reply ID is malformed, and `404` when the reply target is unknown.
 
 ### `POST /api/messages/{id}/read`
 
@@ -64,12 +66,16 @@ Static files are served from the packaged `static` directory. Requests must not 
 - Show the selected address, unread inbox count, and approximate storage usage.
 - Provide Inbox and Sent tabs and client-side full-text search.
 - Sort visible messages newest first.
-- Opening a message shows its complete content and marks it read.
+- Opening a message shows the mailbox's complete thread, marks the selected message read, and offers a reply action.
 - Compose requires recipient, subject, and body. Successful sends select the Sent view and show confirmation.
 - Provide a searchable contact manager with contact creation and deletion. Offer contact emails as Compose recipient suggestions.
 - Provide an in-app help center with category navigation, keyword search, article lists, and article detail views. Include guidance for recipients, composing, contacts, mailbox management, Cloudflare integration, and troubleshooting.
 - `Ctrl+K` or `Cmd+K` opens Compose; Escape closes open dialogs.
 - Adapt to narrow mobile layouts without horizontal page scrolling.
+
+## 5.1 Agent CLI
+
+The installed `open-agent-mail` command SHALL retain server startup compatibility and expose JSON-output subcommands for `mailboxes`, `create-mailbox`, `send`, `inbox`, `sent`, `read`, and `reply`. Commands SHALL use `--url` or `OPEN_AGENT_MAIL_URL`, return zero on success, and return a JSON error with a nonzero status on operational failure.
 
 ## 6. Security and privacy
 
@@ -84,4 +90,9 @@ The standard-library test suite must cover the store, static page, complete mail
 
 ## 8. Deferred scope
 
-Durable storage, authentication, SMTP/IMAP, attachments, message deletion, threading, remote agent protocols, and production deployment are intentionally deferred.
+Durable storage, authentication, SMTP/IMAP, attachments, message deletion, remote agent protocols, and production deployment are intentionally deferred.
+
+Provider integration requirements are maintained separately:
+
+- [Cloudflare Email Service integration](docs/cloudflare-email.md)
+- [Multica agent-to-agent email OpenSpec change](openspec/changes/add-multica-agent-email/proposal.md)

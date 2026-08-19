@@ -2,8 +2,8 @@
 
 
 def main() -> None:
-    """Start the web application from the installed console script."""
-    from .server import main as run
+    """Run the server or an agent-oriented CLI command."""
+    from .cli import main as run
 
     run()
 
