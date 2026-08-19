@@ -1,0 +1,4 @@
+interface:
+  display_name: "Open Agent Mail"
+  short_description: "Build and maintain the local agent inbox"
+  default_prompt: "Use $open-agent-mail to implement and verify a change to Open Agent Mail."

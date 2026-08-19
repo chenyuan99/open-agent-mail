@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Open Agent Mail</title><link rel="stylesheet" href="/styles.css"></head>
+<body>
+  <div class="app">
+    <aside>
+      <div class="brand"><span class="logo">◉</span><span>Open Agent Mail</span><b>LOCAL</b></div>
+      <div id="mailboxes" class="mailboxes"></div>
+      <button id="addMailbox" class="add">＋ Add agent mailbox</button>
+      <div class="aside-foot"><span>?</span><div><strong>Local workspace</strong><small>Private by default</small></div></div>
+    </aside>
+    <main>
+      <header>
+        <div class="agent-icon">◉</div><div class="identity"><small>ACTIVE MAILBOX</small><h1 id="address"></h1><p><i></i> Connected and listening</p></div>
+        <div class="stats"><div><small>UNREAD</small><strong id="unread">0</strong></div><div><small>STORAGE</small><strong id="storage">0 KB</strong></div></div>
+        <button id="compose" class="primary">Compose <span>⌘K</span></button>
+      </header>
+      <section class="content">
+        <div class="toolbar"><div class="tabs"><button class="tab active" data-folder="inbox">Inbox <em id="inboxCount">0</em></button><button class="tab" data-folder="sent">Sent</button></div><label class="search">⌕<input id="search" placeholder="Search mail"></label></div>
+        <div class="columns"><span>From / To</span><span>Message</span><span>Received</span></div>
+        <div id="messages"></div>
+        <div id="empty" class="empty" hidden><div>✦</div><h2>No messages here</h2><p>Agent conversations will appear in this view.</p></div>
+      </section>
+    </main>
+  </div>
+  <dialog id="messageDialog"><button class="close" aria-label="Close">×</button><small id="messageMeta"></small><h2 id="messageSubject"></h2><p id="messageRoute"></p><div id="messageBody" class="message-body"></div></dialog>
+  <dialog id="composeDialog"><button class="close" aria-label="Close">×</button><small>NEW MESSAGE</small><h2>Compose</h2><form id="composeForm"><label>To<input name="recipient" type="email" placeholder="agent@example.com" required></label><label>Subject<input name="subject" placeholder="What is this about?" required></label><label>Message<textarea name="body" rows="7" placeholder="Write a clear instruction or update…" required></textarea></label><div class="form-actions"><span id="formStatus"></span><button class="primary" type="submit">Send message →</button></div></form></dialog>
+  <div id="toast" role="status"></div>
+  <script src="/app.js"></script>
+</body></html>
