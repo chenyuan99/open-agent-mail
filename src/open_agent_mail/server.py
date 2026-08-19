@@ -29,6 +29,14 @@ class Message:
     read: bool = False
 
 
+@dataclass
+class Contact:
+    id: int
+    name: str
+    emails: list[str]
+    groups: list[str]
+
+
 class Store:
     def __init__(self) -> None:
         self.lock = threading.Lock()
@@ -44,10 +52,15 @@ class Store:
                     "Three sources need review", "Three sources have conflicting dates. I flagged them instead of guessing.",
                     "2026-08-18T17:20:00+00:00"),
         ]
+        self.contacts = [
+            Contact(1, "Scout Agent", ["scout@agent.local"], ["Agents"]),
+            Contact(2, "Project Team", ["team@example.com"], ["Work"]),
+        ]
 
     def payload(self) -> dict:
         with self.lock:
-            return {"mailboxes": self.mailboxes, "messages": [asdict(m) for m in self.messages]}
+            return {"mailboxes": self.mailboxes, "messages": [asdict(m) for m in self.messages],
+                    "contacts": [asdict(c) for c in self.contacts]}
 
     def add_mailbox(self, address: str) -> bool:
         with self.lock:
@@ -68,6 +81,24 @@ class Store:
             for message in self.messages:
                 if message.id == message_id:
                     message.read = True
+                    return True
+            return False
+
+    def add_contact(self, name: str, emails: list[str], groups: list[str]) -> Contact | None:
+        with self.lock:
+            normalized = [email.strip().lower() for email in emails if email.strip()]
+            if any(email in contact.emails for contact in self.contacts for email in normalized):
+                return None
+            contact = Contact(max((c.id for c in self.contacts), default=0) + 1, name.strip(),
+                              normalized, sorted({group.strip() for group in groups if group.strip()}))
+            self.contacts.append(contact)
+            return contact
+
+    def delete_contact(self, contact_id: int) -> bool:
+        with self.lock:
+            for index, contact in enumerate(self.contacts):
+                if contact.id == contact_id:
+                    self.contacts.pop(index)
                     return True
             return False
 
@@ -131,6 +162,19 @@ class Handler(BaseHTTPRequestHandler):
             message = STORE.send(*(str(body[key]).strip() for key in required))
             self._json(asdict(message), HTTPStatus.CREATED)
             return
+        if path == "/api/contacts":
+            name, emails, groups = str(body.get("name", "")).strip(), body.get("emails", []), body.get("groups", [])
+            if not name or not isinstance(emails, list) or not emails or not all(
+                isinstance(email, str) and "@" in email and email.strip() for email in emails
+            ) or not isinstance(groups, list):
+                self._json({"error": "A name and at least one valid email are required."}, HTTPStatus.BAD_REQUEST)
+                return
+            contact = STORE.add_contact(name, emails, groups)
+            if contact is None:
+                self._json({"error": "A contact with that email already exists."}, HTTPStatus.CONFLICT)
+                return
+            self._json(asdict(contact), HTTPStatus.CREATED)
+            return
         if path.startswith("/api/messages/") and path.endswith("/read"):
             try:
                 message_id = int(path.split("/")[3])
@@ -138,6 +182,21 @@ class Handler(BaseHTTPRequestHandler):
                 self._json({"error": "Invalid message."}, HTTPStatus.BAD_REQUEST)
                 return
             self._json({"ok": STORE.mark_read(message_id)})
+            return
+        self.send_error(HTTPStatus.NOT_FOUND)
+
+    def do_DELETE(self) -> None:
+        path = urlparse(self.path).path
+        if path.startswith("/api/contacts/"):
+            try:
+                contact_id = int(path.split("/")[3])
+            except (ValueError, IndexError):
+                self._json({"error": "Invalid contact."}, HTTPStatus.BAD_REQUEST)
+                return
+            if not STORE.delete_contact(contact_id):
+                self._json({"error": "Contact not found."}, HTTPStatus.NOT_FOUND)
+                return
+            self._json({"ok": True})
             return
         self.send_error(HTTPStatus.NOT_FOUND)
 

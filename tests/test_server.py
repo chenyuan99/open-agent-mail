@@ -17,6 +17,7 @@ class StoreTests(unittest.TestCase):
         payload = self.store.payload()
         self.assertEqual(2, len(payload["mailboxes"]))
         self.assertEqual(3, len(payload["messages"]))
+        self.assertEqual(2, len(payload["contacts"]))
 
     def test_mailboxes_are_unique(self) -> None:
         self.assertTrue(self.store.add_mailbox("builder@agent.local"))
@@ -32,6 +33,14 @@ class StoreTests(unittest.TestCase):
         self.assertTrue(self.store.mark_read(1))
         self.assertFalse(self.store.mark_read(999))
         self.assertTrue(self.store.payload()["messages"][0]["read"])
+
+    def test_contact_lifecycle_and_duplicate_email(self) -> None:
+        contact = self.store.add_contact("Builder", ["BUILDER@agent.local"], ["Agents", "Agents"])
+        self.assertEqual(["builder@agent.local"], contact.emails)
+        self.assertEqual(["Agents"], contact.groups)
+        self.assertIsNone(self.store.add_contact("Duplicate", ["builder@agent.local"], []))
+        self.assertTrue(self.store.delete_contact(contact.id))
+        self.assertFalse(self.store.delete_contact(contact.id))
 
 
 class HttpTests(unittest.TestCase):
@@ -68,6 +77,17 @@ class HttpTests(unittest.TestCase):
         self.assertEqual(200, status)
         self.assertIn("text/html", content_type)
         self.assertIn(b"Open Agent Mail", body)
+        self.assertIn(b"helpDialog", body)
+
+    def test_serves_help_center_assets(self) -> None:
+        status, content_type, body = self.request("GET", "/help.css")
+        self.assertEqual(200, status)
+        self.assertIn("text/css", content_type)
+        self.assertIn(b"help-dialog", body)
+        status, _, body = self.request("GET", "/app.js")
+        self.assertEqual(200, status)
+        self.assertIn("HELP_ARTICLES".encode(), body)
+        self.assertIn("recipient".encode(), body)
 
     def test_state_endpoint(self) -> None:
         status, _, body = self.request("GET", "/api/state")
@@ -103,6 +123,25 @@ class HttpTests(unittest.TestCase):
         status, _, body = self.request("POST", "/api/messages", {"mailbox": "hello@agent.local"})
         self.assertEqual(400, status)
         self.assertIn("error", json.loads(body))
+
+    def test_contact_api_create_duplicate_validate_and_delete(self) -> None:
+        status, _, body = self.request("POST", "/api/contacts", {
+            "name": "Builder", "emails": ["builder@agent.local"], "groups": ["Agents"]
+        })
+        contact = json.loads(body)
+        self.assertEqual(201, status)
+        self.assertEqual("Builder", contact["name"])
+        status, _, _ = self.request("POST", "/api/contacts", {
+            "name": "Other", "emails": ["builder@agent.local"], "groups": []
+        })
+        self.assertEqual(409, status)
+        status, _, _ = self.request("POST", "/api/contacts", {"name": "Invalid", "emails": []})
+        self.assertEqual(400, status)
+        status, _, body = self.request("DELETE", f"/api/contacts/{contact['id']}")
+        self.assertEqual(200, status)
+        self.assertTrue(json.loads(body)["ok"])
+        status, _, _ = self.request("DELETE", f"/api/contacts/{contact['id']}")
+        self.assertEqual(404, status)
 
     def test_malformed_read_id_and_missing_resource(self) -> None:
         status, _, _ = self.request("POST", "/api/messages/not-a-number/read", {})

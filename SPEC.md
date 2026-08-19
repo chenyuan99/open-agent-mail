@@ -14,7 +14,7 @@ Open Agent Mail is a local web inbox for short messages exchanged between humans
 
 ## 3. Domain model
 
-A mailbox is a unique address ending in `@agent.local`. A message contains:
+A mailbox is a unique address ending in `@agent.local`. A contact has a unique integer ID, a name, one or more email addresses, and zero or more group labels. A message contains:
 
 | Field | Type | Meaning |
 | --- | --- | --- |
@@ -48,6 +48,14 @@ Accept non-empty `mailbox`, `recipient`, `subject`, and `body` strings. Create a
 
 Mark an existing message as read and return `200` with `{ "ok": true }`. Unknown identifiers return `200` with `{ "ok": false }`; malformed identifiers return `400`.
 
+### `POST /api/contacts`
+
+Accept `{ "name": string, "emails": string[], "groups": string[] }`. Return the contact with `201`, `400` for invalid input, or `409` when an email is already assigned to another contact.
+
+### `DELETE /api/contacts/{id}`
+
+Delete a contact and return `{ "ok": true }`. Return `400` for malformed IDs and `404` for unknown contacts.
+
 Static files are served from the packaged `static` directory. Requests must not escape that directory.
 
 ## 5. Interface behavior
@@ -58,6 +66,8 @@ Static files are served from the packaged `static` directory. Requests must not 
 - Sort visible messages newest first.
 - Opening a message shows its complete content and marks it read.
 - Compose requires recipient, subject, and body. Successful sends select the Sent view and show confirmation.
+- Provide a searchable contact manager with contact creation and deletion. Offer contact emails as Compose recipient suggestions.
+- Provide an in-app help center with category navigation, keyword search, article lists, and article detail views. Include guidance for recipients, composing, contacts, mailbox management, Cloudflare integration, and troubleshooting.
 - `Ctrl+K` or `Cmd+K` opens Compose; Escape closes open dialogs.
 - Adapt to narrow mobile layouts without horizontal page scrolling.
 
@@ -70,8 +80,8 @@ Static files are served from the packaged `static` directory. Requests must not 
 
 ## 7. Acceptance criteria
 
-The standard-library test suite must cover the store, static page, complete API happy path, validation failures, duplicate mailboxes, read state, and missing resources. Python compilation and tests must pass before handoff.
+The standard-library test suite must cover the store, static page, complete mailbox and contact API happy paths, validation failures, duplicate records, read state, and missing resources. Python compilation and tests must pass before handoff.
 
 ## 8. Deferred scope
 
-Durable storage, authentication, SMTP/IMAP, attachments, deletion, threading, remote agent protocols, and production deployment are intentionally deferred.
+Durable storage, authentication, SMTP/IMAP, attachments, message deletion, threading, remote agent protocols, and production deployment are intentionally deferred.
