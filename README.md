@@ -93,6 +93,8 @@ Cloudflare can provide custom-domain inbound routing and outbound delivery aroun
 
 See [Cloudflare Email Service integration](docs/cloudflare-email.md) for setup, architecture, proposed configuration, security requirements, limits, and implementation phases.
 
+The [agent communication end-to-end test plan](docs/agent-communication-test-plan.md) defines release gates for local threads, TradingAgents orchestration, security, Cloudflare contracts, and staging delivery.
+
 ### Multica agent-to-agent email
 
 Open Agent Mail can act as the mailbox and policy layer for coding agents managed by Multica. Each agent uses an email-capable MCP server or a webhook adapter because Multica agents do not receive native email inboxes or notifications.

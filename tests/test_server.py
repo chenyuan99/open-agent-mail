@@ -41,6 +41,35 @@ class StoreTests(unittest.TestCase):
         self.assertEqual(first.thread_id, reply.thread_id)
         self.assertEqual(inbox_copy["id"], reply.in_reply_to)
 
+    def test_complete_company_handoff_stays_in_one_thread(self) -> None:
+        roles = ["analyst", "research-manager", "trader", "risk", "portfolio-manager"]
+        for role in roles:
+            self.assertTrue(self.store.add_mailbox(f"{role}@agent.local"))
+
+        parent_id = None
+        thread_id = None
+        for sender, recipient in zip(roles, roles[1:]):
+            message = self.store.send(
+                f"{sender}@agent.local",
+                f"{recipient}@agent.local",
+                "[TRADE-REVIEW] [AAPL] 2026-08-19",
+                f"Handoff from {sender} to {recipient}",
+                parent_id,
+            )
+            self.assertIsNotNone(message)
+            thread_id = thread_id or message.thread_id
+            self.assertEqual(thread_id, message.thread_id)
+            recipient_copy = self.store.payload()["messages"][-1]
+            self.assertEqual(f"{recipient}@agent.local", recipient_copy["mailbox"])
+            self.assertEqual("inbox", recipient_copy["folder"])
+            self.assertEqual(thread_id, recipient_copy["thread_id"])
+            parent_id = recipient_copy["id"]
+
+        records = [message for message in self.store.payload()["messages"] if message["thread_id"] == thread_id]
+        self.assertEqual(2 * (len(roles) - 1), len(records))
+        self.assertEqual(1, sum(message["mailbox"] == "analyst@agent.local" for message in records))
+        self.assertEqual(1, sum(message["mailbox"] == "portfolio-manager@agent.local" for message in records))
+
     def test_mark_read_reports_presence(self) -> None:
         self.assertTrue(self.store.mark_read(1))
         self.assertFalse(self.store.mark_read(999))
@@ -172,6 +201,24 @@ class HttpTests(unittest.TestCase):
         self.assertEqual(0, run_cli(["reply", "--url", base, "--from", "research@agent.local",
                                     str(delivered["id"]), "--body", "Approved"], output))
         self.assertEqual(sent["thread_id"], json.loads(output.getvalue())["thread_id"])
+
+    def test_agent_cli_unknown_reply_is_json_error_without_mutation(self) -> None:
+        base = f"http://127.0.0.1:{self.httpd.server_port}"
+        before = len(server_module.STORE.payload()["messages"])
+        output, errors = StringIO(), StringIO()
+        status = run_cli(["reply", "--url", base, "--from", "hello@agent.local",
+                          "999", "--body", "Should not send"], output, errors)
+        self.assertEqual(1, status)
+        self.assertEqual("", output.getvalue())
+        self.assertEqual({"error": "Message not found in that mailbox."}, json.loads(errors.getvalue()))
+        self.assertEqual(before, len(server_module.STORE.payload()["messages"]))
+
+    def test_agent_cli_unreachable_server_is_json_error(self) -> None:
+        output, errors = StringIO(), StringIO()
+        status = run_cli(["mailboxes", "--url", "http://127.0.0.1:1"], output, errors)
+        self.assertEqual(1, status)
+        self.assertEqual("", output.getvalue())
+        self.assertIn("Cannot connect", json.loads(errors.getvalue())["error"])
 
     def test_contact_api_create_duplicate_validate_and_delete(self) -> None:
         status, _, body = self.request("POST", "/api/contacts", {
