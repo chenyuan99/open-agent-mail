@@ -2,12 +2,16 @@ from __future__ import annotations
 
 import json
 from io import StringIO
+import socket
 import threading
+import time
 import unittest
 from http.client import HTTPConnection
 
+import uvicorn
+
 import open_agent_mail.server as server_module
-from open_agent_mail.server import Handler, Store, ThreadingHTTPServer
+from open_agent_mail.server import Store
 from open_agent_mail.cli import run as run_cli
 
 
@@ -88,22 +92,31 @@ class HttpTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
         cls.original_store = server_module.STORE
-        cls.httpd = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
-        cls.thread = threading.Thread(target=cls.httpd.serve_forever, daemon=True)
+        with socket.socket() as available:
+            available.bind(("127.0.0.1", 0))
+            cls.server_port = available.getsockname()[1]
+        config = uvicorn.Config(server_module.app, host="127.0.0.1", port=cls.server_port, log_level="error")
+        cls.httpd = uvicorn.Server(config)
+        cls.thread = threading.Thread(target=cls.httpd.run, daemon=True)
         cls.thread.start()
+        for _ in range(100):
+            if cls.httpd.started:
+                break
+            time.sleep(0.02)
+        if not cls.httpd.started:
+            raise RuntimeError("Test API server did not start.")
 
     @classmethod
     def tearDownClass(cls) -> None:
-        cls.httpd.shutdown()
-        cls.httpd.server_close()
-        cls.thread.join(timeout=2)
+        cls.httpd.should_exit = True
+        cls.thread.join(timeout=5)
         server_module.STORE = cls.original_store
 
     def setUp(self) -> None:
         server_module.STORE = Store()
 
     def request(self, method: str, path: str, payload: dict | None = None):
-        connection = HTTPConnection("127.0.0.1", self.httpd.server_port, timeout=3)
+        connection = HTTPConnection("127.0.0.1", self.server_port, timeout=3)
         body = None if payload is None else json.dumps(payload)
         headers = {} if payload is None else {"Content-Type": "application/json"}
         connection.request(method, path, body=body, headers=headers)
@@ -146,6 +159,35 @@ class HttpTests(unittest.TestCase):
         self.assertEqual(200, status)
         self.assertEqual(2, len(json.loads(body)["mailboxes"]))
 
+    def test_openapi_schema_documents_every_api_path(self) -> None:
+        status, content_type, body = self.request("GET", "/openapi.json")
+        schema = json.loads(body)
+        self.assertEqual(200, status)
+        self.assertIn("application/json", content_type)
+        self.assertEqual("3.1.0", schema["openapi"])
+        self.assertEqual({
+            "/api/state", "/api/mailboxes", "/api/messages", "/api/messages/{message_id}/read",
+            "/api/contacts", "/api/contacts/{contact_id}",
+        }, set(schema["paths"]))
+        self.assertIn("MessageResponse", schema["components"]["schemas"])
+
+    def test_serves_same_origin_swagger_ui(self) -> None:
+        status, content_type, body = self.request("GET", "/docs")
+        self.assertEqual(200, status)
+        self.assertIn("text/html", content_type)
+        self.assertIn(b"/openapi.json", body)
+        self.assertIn(b"/swagger/swagger-ui-bundle.js", body)
+        self.assertNotIn(b"https://", body)
+        for path, expected_type, marker in (
+            ("/swagger/swagger-ui.css", "text/css", b".swagger-ui"),
+            ("/swagger/swagger-ui-bundle.js", "javascript", b"SwaggerUIBundle"),
+            ("/swagger/LICENSE", "application/octet-stream", b"Apache License"),
+        ):
+            status, content_type, asset = self.request("GET", path)
+            self.assertEqual(200, status)
+            self.assertIn(expected_type, content_type)
+            self.assertIn(marker, asset)
+
     def test_complete_mailbox_and_message_flow(self) -> None:
         status, _, body = self.request("POST", "/api/mailboxes", {"name": "Build Bot"})
         self.assertEqual(201, status)
@@ -185,7 +227,7 @@ class HttpTests(unittest.TestCase):
         self.assertIn("error", json.loads(body))
 
     def test_agent_cli_send_list_read_and_reply(self) -> None:
-        base = f"http://127.0.0.1:{self.httpd.server_port}"
+        base = f"http://127.0.0.1:{self.server_port}"
         output = StringIO()
         self.assertEqual(0, run_cli(["send", "--url", base, "--from", "hello@agent.local",
                                     "--to", "research@agent.local", "--subject", "Review", "--body", "Check it"], output))
@@ -203,7 +245,7 @@ class HttpTests(unittest.TestCase):
         self.assertEqual(sent["thread_id"], json.loads(output.getvalue())["thread_id"])
 
     def test_agent_cli_unknown_reply_is_json_error_without_mutation(self) -> None:
-        base = f"http://127.0.0.1:{self.httpd.server_port}"
+        base = f"http://127.0.0.1:{self.server_port}"
         before = len(server_module.STORE.payload()["messages"])
         output, errors = StringIO(), StringIO()
         status = run_cli(["reply", "--url", base, "--from", "hello@agent.local",

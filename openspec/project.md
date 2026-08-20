@@ -2,12 +2,12 @@
 
 ## Purpose
 
-Open Agent Mail is a local-first inbox for messages between humans and software agents. It currently provides a zero-runtime-dependency Python HTTP server, in-memory mailboxes/messages/contacts, and a framework-free browser client.
+Open Agent Mail is a local-first inbox for messages between humans and software agents. It provides a typed FastAPI/Uvicorn HTTP service, in-memory mailboxes/messages/contacts, and a framework-free browser client.
 
 ## Constraints
 
 - Python 3.12 or newer.
-- No third-party runtime dependencies in the shipped local application unless a change explicitly revises this constraint.
+- Runtime dependencies are limited to FastAPI, Typer, Uvicorn, and their transitive requirements unless a change explicitly revises this constraint.
 - Loopback binding by default.
 - Untrusted input is validated server-side and escaped before HTML insertion.
 - Current storage is intentionally process-local and non-durable.

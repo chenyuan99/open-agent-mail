@@ -1,15 +1,23 @@
 from __future__ import annotations
 
-import argparse
 import json
-import os
 import sys
+from dataclasses import dataclass
 from typing import Any, Sequence, TextIO
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
+import typer
 
-COMMANDS = {"mailboxes", "create-mailbox", "send", "inbox", "sent", "read", "reply"}
+
+DEFAULT_URL = "http://127.0.0.1:8787"
+app = typer.Typer(help="Run Open Agent Mail or use its agent-oriented JSON CLI.", no_args_is_help=False)
+
+
+@dataclass
+class Output:
+    stdout: TextIO = sys.stdout
+    stderr: TextIO = sys.stderr
 
 
 class Client:
@@ -18,10 +26,8 @@ class Client:
 
     def request(self, method: str, path: str, payload: dict[str, Any] | None = None) -> Any:
         data = None if payload is None else json.dumps(payload).encode()
-        request = Request(
-            f"{self.base_url}{path}", data=data, method=method,
-            headers={"Content-Type": "application/json"} if data is not None else {},
-        )
+        request = Request(f"{self.base_url}{path}", data=data, method=method,
+                          headers={"Content-Type": "application/json"} if data is not None else {})
         try:
             with urlopen(request, timeout=10) as response:
                 return json.load(response)
@@ -35,40 +41,14 @@ class Client:
             raise RuntimeError(f"Cannot connect to {self.base_url}: {error.reason}") from error
 
 
-def parser() -> argparse.ArgumentParser:
-    root = argparse.ArgumentParser(description="Agent CLI for Open Agent Mail")
-    sub = root.add_subparsers(dest="command", required=True)
+def _output(ctx: typer.Context) -> Output:
+    return ctx.ensure_object(Output)
 
-    def command(name: str, help_text: str) -> argparse.ArgumentParser:
-        result = sub.add_parser(name, help=help_text)
-        result.add_argument("--url", default=os.environ.get("OPEN_AGENT_MAIL_URL", "http://127.0.0.1:8787"))
-        return result
 
-    command("mailboxes", "List mailbox addresses")
-    create = command("create-mailbox", "Create a local agent mailbox")
-    create.add_argument("name")
-
-    send = command("send", "Send a new email")
-    send.add_argument("--from", dest="sender", required=True)
-    send.add_argument("--to", dest="recipient", required=True)
-    send.add_argument("--subject", required=True)
-    send.add_argument("--body", required=True)
-
-    for name in ("inbox", "sent"):
-        listing = command(name, f"List {name} messages")
-        listing.add_argument("--mailbox", required=True)
-        listing.add_argument("--unread", action="store_true")
-
-    read = command("read", "Read one message by ID")
-    read.add_argument("message_id", type=int)
-    read.add_argument("--mailbox", required=True)
-
-    reply = command("reply", "Reply to a message in its thread")
-    reply.add_argument("message_id", type=int)
-    reply.add_argument("--from", dest="sender", required=True)
-    reply.add_argument("--body", required=True)
-    reply.add_argument("--subject")
-    return root
+def _emit(ctx: typer.Context, value: Any) -> None:
+    stream = _output(ctx).stdout
+    json.dump(value, stream, ensure_ascii=False)
+    stream.write("\n")
 
 
 def _find_message(state: dict[str, Any], message_id: int, mailbox: str) -> dict[str, Any]:
@@ -78,40 +58,84 @@ def _find_message(state: dict[str, Any], message_id: int, mailbox: str) -> dict[
     return message
 
 
+UrlOption = typer.Option(DEFAULT_URL, "--url", envvar="OPEN_AGENT_MAIL_URL", help="Open Agent Mail server URL.")
+
+
+@app.callback(invoke_without_command=True)
+def root(ctx: typer.Context, host: str = "127.0.0.1", port: int = 8787,
+         no_browser: bool = typer.Option(False, "--no-browser", help="Do not open the browser.")) -> None:
+    if ctx.invoked_subcommand is None:
+        from .server import serve
+        serve(host, port, no_browser)
+
+
+@app.command()
+def mailboxes(ctx: typer.Context, url: str = UrlOption) -> None:
+    _emit(ctx, {"mailboxes": Client(url).request("GET", "/api/state")["mailboxes"]})
+
+
+@app.command("create-mailbox")
+def create_mailbox(ctx: typer.Context, name: str, url: str = UrlOption) -> None:
+    _emit(ctx, Client(url).request("POST", "/api/mailboxes", {"name": name}))
+
+
+@app.command()
+def send(ctx: typer.Context, sender: str = typer.Option(..., "--from"),
+         recipient: str = typer.Option(..., "--to"), subject: str = typer.Option(...),
+         body: str = typer.Option(...), url: str = UrlOption) -> None:
+    _emit(ctx, Client(url).request("POST", "/api/messages", {
+        "mailbox": sender, "recipient": recipient, "subject": subject, "body": body,
+    }))
+
+
+def _list_messages(ctx: typer.Context, folder: str, mailbox: str, unread: bool, url: str) -> None:
+    state = Client(url).request("GET", "/api/state")
+    messages = [item for item in state["messages"] if item["mailbox"] == mailbox
+                and item["folder"] == folder and (not unread or not item["read"])]
+    _emit(ctx, {"messages": sorted(messages, key=lambda item: item["created_at"], reverse=True)})
+
+
+@app.command()
+def inbox(ctx: typer.Context, mailbox: str = typer.Option(...), unread: bool = False,
+          url: str = UrlOption) -> None:
+    _list_messages(ctx, "inbox", mailbox, unread, url)
+
+
+@app.command()
+def sent(ctx: typer.Context, mailbox: str = typer.Option(...), unread: bool = False,
+         url: str = UrlOption) -> None:
+    _list_messages(ctx, "sent", mailbox, unread, url)
+
+
+@app.command("read")
+def read_message(ctx: typer.Context, message_id: int, mailbox: str = typer.Option(...),
+                 url: str = UrlOption) -> None:
+    client = Client(url)
+    state = client.request("GET", "/api/state")
+    result = _find_message(state, message_id, mailbox)
+    client.request("POST", f"/api/messages/{message_id}/read", {})
+    _emit(ctx, result)
+
+
+@app.command()
+def reply(ctx: typer.Context, message_id: int, sender: str = typer.Option(..., "--from"),
+          body: str = typer.Option(...), subject: str | None = typer.Option(None),
+          url: str = UrlOption) -> None:
+    client = Client(url)
+    state = client.request("GET", "/api/state")
+    parent = _find_message(state, message_id, sender)
+    recipient = parent["recipient"] if parent["sender"] == sender else parent["sender"]
+    reply_subject = subject or (parent["subject"] if parent["subject"].lower().startswith("re:")
+                                else f"Re: {parent['subject']}")
+    _emit(ctx, client.request("POST", "/api/messages", {
+        "mailbox": sender, "recipient": recipient, "subject": reply_subject,
+        "body": body, "in_reply_to": message_id,
+    }))
+
+
 def run(argv: Sequence[str], stdout: TextIO = sys.stdout, stderr: TextIO = sys.stderr) -> int:
-    args = parser().parse_args(list(argv))
-    client = Client(args.url)
     try:
-        if args.command == "mailboxes":
-            result: Any = {"mailboxes": client.request("GET", "/api/state")["mailboxes"]}
-        elif args.command == "create-mailbox":
-            result = client.request("POST", "/api/mailboxes", {"name": args.name})
-        elif args.command == "send":
-            result = client.request("POST", "/api/messages", {
-                "mailbox": args.sender, "recipient": args.recipient,
-                "subject": args.subject, "body": args.body,
-            })
-        elif args.command in {"inbox", "sent"}:
-            state = client.request("GET", "/api/state")
-            messages = [item for item in state["messages"] if item["mailbox"] == args.mailbox
-                        and item["folder"] == args.command and (not args.unread or not item["read"])]
-            result = {"messages": sorted(messages, key=lambda item: item["created_at"], reverse=True)}
-        elif args.command == "read":
-            state = client.request("GET", "/api/state")
-            result = _find_message(state, args.message_id, args.mailbox)
-            client.request("POST", f"/api/messages/{args.message_id}/read", {})
-        else:
-            state = client.request("GET", "/api/state")
-            parent = _find_message(state, args.message_id, args.sender)
-            recipient = parent["recipient"] if parent["sender"] == args.sender else parent["sender"]
-            subject = args.subject or (parent["subject"] if parent["subject"].lower().startswith("re:")
-                                       else f"Re: {parent['subject']}")
-            result = client.request("POST", "/api/messages", {
-                "mailbox": args.sender, "recipient": recipient, "subject": subject,
-                "body": args.body, "in_reply_to": args.message_id,
-            })
-        json.dump(result, stdout, ensure_ascii=False)
-        stdout.write("\n")
+        app(args=list(argv), prog_name="open-agent-mail", standalone_mode=False, obj=Output(stdout, stderr))
         return 0
     except RuntimeError as error:
         json.dump({"error": str(error)}, stderr)
@@ -120,8 +144,4 @@ def run(argv: Sequence[str], stdout: TextIO = sys.stdout, stderr: TextIO = sys.s
 
 
 def main(argv: Sequence[str] | None = None) -> None:
-    values = list(sys.argv[1:] if argv is None else argv)
-    if values and values[0] in COMMANDS:
-        raise SystemExit(run(values))
-    from .server import main as serve
-    serve(values)
+    raise SystemExit(run(sys.argv[1:] if argv is None else argv))

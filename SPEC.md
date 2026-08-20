@@ -7,7 +7,7 @@ Open Agent Mail is a local web inbox for short messages exchanged between humans
 ## 2. Runtime
 
 - Support Python 3.12 or newer.
-- Require no third-party runtime dependencies.
+- Use FastAPI for typed HTTP routing and generated OpenAPI, Typer for the command-line interface, and Uvicorn as the ASGI server.
 - Listen on `127.0.0.1:8787` by default.
 - Accept `--host`, `--port`, and `--no-browser` command-line options.
 - Store data in memory. Restarting the process restores seeded data.
@@ -58,6 +58,10 @@ Accept `{ "name": string, "emails": string[], "groups": string[] }`. Return the 
 
 Delete a contact and return `{ "ok": true }`. Return `400` for malformed IDs and `404` for unknown contacts.
 
+### API documentation
+
+`GET /openapi.json` returns the complete OpenAPI 3.1 contract. `GET /docs` serves a pinned, same-origin Swagger UI that supports interactive requests without a runtime CDN dependency.
+
 Static files are served from the packaged `static` directory. Requests must not escape that directory.
 
 ## 5. Interface behavior
@@ -86,7 +90,7 @@ The installed `open-agent-mail` command SHALL retain server startup compatibilit
 
 ## 7. Acceptance criteria
 
-The standard-library test suite must cover the store, static page, complete mailbox and contact API happy paths, validation failures, duplicate records, read state, and missing resources. Python compilation and tests must pass before handoff.
+The `unittest` suite must cover the store, live Uvicorn server, static page, complete mailbox and contact API happy paths, validation failures, duplicate records, read state, and missing resources. Python compilation and tests must pass before handoff.
 
 ## 8. Deferred scope
 

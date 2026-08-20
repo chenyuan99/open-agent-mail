@@ -1,6 +1,10 @@
 # Open Agent Mail
 
-A local-first inbox for messages between people and software agents. It includes multiple agent mailboxes, local agent-to-agent delivery, threaded replies, inbox and sent views, search, read state, contact management, recipient autocomplete, message composition, and an in-app help center, with no runtime dependencies.
+[![CI](https://github.com/chenyuan99/open-agent-mail/actions/workflows/ci.yml/badge.svg)](https://github.com/chenyuan99/open-agent-mail/actions/workflows/ci.yml)
+
+A local-first inbox for messages between people and software agents. It includes multiple agent mailboxes, local agent-to-agent delivery, threaded replies, inbox and sent views, search, read state, contact management, recipient autocomplete, message composition, and an in-app help center. FastAPI provides the typed API and Uvicorn serves it.
+
+Interactive API documentation is available at [`/docs`](http://127.0.0.1:8787/docs), with the OpenAPI 3.1 document at [`/openapi.json`](http://127.0.0.1:8787/openapi.json).
 
 ## Run
 
@@ -19,14 +23,14 @@ The app opens at <http://127.0.0.1:8787>. Use `--no-browser`, `--host`, or `--po
 
 ## System design
 
-Open Agent Mail is a single-process, local-first web application. A Python standard-library HTTP server owns the application state and serves a framework-free browser client. There is no database, build step, or external service dependency.
+Open Agent Mail is a single-process, local-first web application. A FastAPI application owns the HTTP contract and in-memory state, Uvicorn serves ASGI requests, and the framework-free browser client remains build-free. There is no database or external service dependency.
 
 ```mermaid
 flowchart LR
-    U[Browser] -->|HTML, CSS, JavaScript| H[ThreadingHTTPServer]
-    U -->|JSON over HTTP| A[Request Handler]
-    H --> S[Packaged static files]
-    A --> V[Input validation]
+    U[Browser / Agent CLI] -->|HTTP| H[Uvicorn ASGI server]
+    H --> A[FastAPI application]
+    A --> S[Packaged static files]
+    A --> V[Pydantic validation]
     V --> D[Thread-safe Store]
     D --> M[(Mailboxes)]
     D --> E[(Messages)]
@@ -38,10 +42,10 @@ flowchart LR
 | Component | Responsibility |
 | --- | --- |
 | Browser client | Renders mailboxes, messages, contacts, dialogs, search, and recipient autocomplete. It escapes values before inserting data-derived HTML. |
-| `Handler` | Routes HTTP requests, decodes JSON, validates inputs, maps failures to status codes, and confines static-file access to the packaged static directory. |
+| FastAPI application | Routes typed HTTP operations, generates OpenAPI, normalizes errors, and mounts packaged static files. |
 | `Store` | Owns mailboxes, messages, contacts, ID allocation, and mutations. A lock serializes access across request threads. |
-| `ThreadingHTTPServer` | Serves independent requests concurrently and binds to loopback by default. |
-| CLI | Parses host, port, and browser-launch options and manages server startup and shutdown. |
+| Uvicorn | Serves the ASGI application and binds to loopback by default. |
+| CLI | Uses Typer for server startup options and JSON-oriented agent commands. |
 
 ### Request and state flow
 
@@ -49,7 +53,7 @@ flowchart LR
 2. `GET /api/state` returns one snapshot containing mailboxes, messages, and contacts.
 3. The browser filters, sorts, and searches that snapshot locally for immediate interaction.
 4. Mutations such as sending a message or adding a contact go through JSON API endpoints.
-5. The server validates and applies each mutation under the store lock, then returns the created object or a structured error.
+5. FastAPI and Pydantic validate each request; the store applies mutations under its lock and returns a typed object or structured error.
 6. The browser updates its local snapshot from the successful response without reloading the page.
 
 The store is intentionally process-local. Restarting the server restores the seeded dataset. This keeps development simple and avoids silently writing user mail to disk, but it means the current release is not suitable for durable or multi-instance deployment.
@@ -129,3 +133,5 @@ python -m unittest discover -s tests -v
 python -m compileall -q src tests
 Remove-Item Env:\PYTHONPATH
 ```
+
+GitHub Actions runs the suite on Python 3.12, 3.13, and 3.14 for every pull request and push to `main`. After all test variants pass, it builds the source and wheel distributions, installs the wheel, smoke-tests the CLI, and retains the packages as workflow artifacts for 14 days. Version tags matching `v*` run the same delivery pipeline; publishing to a package registry remains intentionally unconfigured until a destination and trusted-publishing policy are selected.

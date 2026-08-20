@@ -2,7 +2,7 @@
 
 ## Mission
 
-Maintain a small, local-first inbox for communication between people and software agents. Preserve the zero-runtime-dependency architecture unless a specification change explicitly requires otherwise.
+Maintain a small, local-first inbox for communication between people and software agents. Keep the FastAPI/Uvicorn backend focused and the browser client build-free.
 
 ## Source of truth
 
@@ -12,15 +12,15 @@ For proposed capabilities, use the OpenSpec workflow in `openspec/`: review `pro
 
 ## Architecture
 
-- `src/open_agent_mail/server.py`: in-memory domain store, HTTP API, static-file server, and CLI.
+- `src/open_agent_mail/server.py`: in-memory domain store, typed FastAPI application, static mounts, and Uvicorn runner.
 - `src/open_agent_mail/static/`: framework-free browser interface.
-- `tests/`: standard-library unit and HTTP integration tests.
+- `tests/`: `unittest` domain and live-Uvicorn HTTP integration tests.
 - `.agents/skills/open-agent-mail/`: reusable workflow for future agents.
 - `openspec/`: current capability specs and self-contained proposed changes.
 
 ## Working rules
 
-- Keep the app runnable on Python 3.12+ without runtime packages.
+- Keep runtime dependencies limited to FastAPI, Typer, Uvicorn, and their transitive requirements unless a specification change requires more.
 - Treat all request data as untrusted. Validate input and escape data rendered in HTML.
 - Keep API errors in the form `{"error": "message"}` with an appropriate HTTP status.
 - Do not add durable storage accidentally; the current store intentionally resets on restart.
@@ -32,6 +32,7 @@ For proposed capabilities, use the OpenSpec workflow in `openspec/`: review `pro
 Run from the repository root:
 
 ```powershell
+python -m pip install -e .
 $env:PYTHONPATH = "src"
 C:\Python314\python.exe -m unittest discover -s tests -v
 C:\Python314\python.exe -m compileall -q src tests
